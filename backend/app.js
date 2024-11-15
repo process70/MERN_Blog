@@ -38,6 +38,11 @@ app.use('/uploads',express.static("uploads"))
 app.use("/blog/users", userRoutes)
 app.use("/blog/posts", postRoutes)
 
+// Serve static files from the React/Vite app
+app.use(express.static(path.join(__dirname, '../frontend/build')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/build/index.html'))});
 app.use(notFound);
 app.use(errorHandler)
 // app.use((req, res, next) => {
@@ -45,9 +50,4 @@ app.use(errorHandler)
 //         message: "Not Found"+req.originalUrl
 //     })
 // })
-// Serve static files from the React/Vite app
-app.use(express.static(path.join(__dirname, '../frontend/build')));
-
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/build/index.html'))});
 
