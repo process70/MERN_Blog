@@ -51,7 +51,7 @@ function PostDetail() {
         </div>
         <h1>{post?.title}</h1>
         <div className="post-detail__thumbnail">
-          <img src = {`$${post?.thumbnail}`} alt="" />
+          <img src = {`${post?.thumbnail}`} alt="" />
         </div>
       </div>}
     </section>
