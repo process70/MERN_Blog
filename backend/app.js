@@ -2,13 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const {connect} = require("mongoose")
 const upload = require("express-fileupload")
-const path = require('path')
+
 require("dotenv").config()
 
 const postRoutes = require ("./Routes/postRoutes")
 const userRoutes = require ("./Routes/userRoutes")
 
 const {notFound, errorHandler} = require('./Midllewares/error')
+
+const { v2 : cloudinary } = require ("cloudinary");
 
 const app = express();
 
@@ -23,7 +25,18 @@ app.use(cors({   // enabling the cross-origin sharing that will let you connect 
     origin: process.env.FRONTEND_URL,
     credentials: true
 }))
-app.use(upload())
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true // Enable this for https
+  })
+  // this configuration is important when using cloudinary
+  app.use(upload({
+    useTempFiles: true,
+    tempFileDir: '/tmp/'
+  }));
 
 //express.static served to the static files like text, images or css files
 connect(process.env.MONGO_URI).then((res) => {            
@@ -38,11 +51,6 @@ app.use('/uploads',express.static("uploads"))
 app.use("/blog/users", userRoutes)
 app.use("/blog/posts", postRoutes)
 
-// Serve static files from the React/Vite app
-app.use(express.static(path.join(__dirname, '../frontend/build')));
-
-// Handle React routing, return all requests to React app
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, '../frontend/build/index.html'))});
 app.use(notFound);
 app.use(errorHandler)
 // app.use((req, res, next) => {
