@@ -5,6 +5,8 @@ const jwt = require("jsonwebtoken")
 const {v4: uuid} = require("uuid")
 const path = require("path")
 const fs = require("fs")
+const { v2 : cloudinary } = require("cloudinary");
+
 /* =====================REGISTER===================== */
 
 const register = async (req, res, next) => {
@@ -110,11 +112,22 @@ const authorAvatar = async (req, res, next) => {
             
             if(user.avatar) {
                 // delete old avatar file if exists
-                fs.unlink(path.join(__dirname, "..", "uploads", user.avatar), (err) =>{
+/*                 fs.unlink(path.join(__dirname, "..", "uploads", user.avatar), (err) =>{
                     if(err)  return next(new HttpError("error occured while deleting the file"))
-                })
+                }) */
+                try {
+                    const result = await cloudinary.uploader.destroy(
+                        `BLOG_Images/${user.avatar.split("/").pop().split(".")[0]}`, {
+                            invalidate: true,
+                            resource_type: "image"
+                        });
+                } catch (error) {
+                    console.error('Cloudinary delete image error:', error);
+                    // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+                    return next(new HttpError("Delete uploaded images failed " + error.message ), 500)
+                }
             }
-			console.log("avatar property does not exist on the collection")
+/* 			console.log("avatar property does not exist on the collection")
                         // check file size
             if(avatar.size > 5000000) {   //500KB
                 return next(new HttpError("Profile picture too big. Should be less than 500kb"), 422)
@@ -126,9 +139,28 @@ const authorAvatar = async (req, res, next) => {
             
             avatar.mv(path.join(__dirname, '..', 'uploads', newFilename), async (err) => {
                 if (err) return next(new HttpError("error occured while deleting the file"))                
-            })
+            }) */
+                let profileImagePath = ''
+                try {
+                  // Upload new image
+                  const result = await cloudinary.uploader.upload(avatar.tempFilePath, {
+                      folder: 'BLOG_Images' // Optional: organize images in folders
+                  });
+        
+                  if (!result.secure_url) {
+                      // return res.status(400).json({ message: "Failed to upload image" });
+                      return next(new HttpError("Failed to upload image"), 400)
+                  }
+        
+                 profileImagePath = result.secure_url;
+        
+                } catch (uploadError) {
+                    console.error('Cloudinary upload error:', uploadError);
+                    // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+                    return next(new HttpError("Image upload failed " + uploadError.message ), 500)
+                }
 		    
-			const avatarUpdated = await User.findByIdAndUpdate(user.id, {avatar: newFilename}, {new: true})
+			const avatarUpdated = await User.findByIdAndUpdate(user.id, {avatar: profileImagePath}, {new: true})
 			// avatarUpdated will contain the new updated author detail
 			if(avatarUpdated) res.status(200).json(avatarUpdated)
             else return next(new HttpError("error occured while updating the authors's avatar"))
