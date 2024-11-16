@@ -19,7 +19,6 @@ function Login() {
     setUserData(
       {...userData, [e.target.name]: e.target.value}
     )
-    console.log(userData)
   }
 
   const loginSubmit = async(e) => {
