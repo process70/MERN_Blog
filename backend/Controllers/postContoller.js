@@ -4,6 +4,7 @@ const HttpError = require('../Modals/errorModal')
 const path = require("path")
 const fs = require("fs")
 const {v4: uuid} = require("uuid")
+const { v2 : cloudinary } = require("cloudinary");
 
 
 /*========================GET POST===================*/
@@ -41,7 +42,7 @@ const createPost = async (req, res, next) => {
         const splittedName = thumbnail.name.split('.')
         const newFileName = splittedName[0] + "." +uuid() + "." + splittedName[splittedName.length - 1]
         
-        thumbnail.mv(path.join(__dirname, '..', 'uploads', newFileName), async (err) => {
+/*         thumbnail.mv(path.join(__dirname, '..', 'uploads', newFileName), async (err) => {
             if(err) return next(new HttpError("Unknown Error occured while saving the file", 422))
         
             const createdPost = await Post.create({title, description, category, thumbnail: newFileName, creator: req.user.id})
@@ -55,7 +56,40 @@ const createPost = async (req, res, next) => {
             }
 
             res.status(200).json(createdPost)
-        })
+        }) */
+
+        /* upload image to cloudinary */
+        let profileImagePath = ''
+        try {
+          // Upload new image
+          const result = await cloudinary.uploader.upload(thumbnail.tempFilePath, {
+              folder: 'BLOG_Images' // Optional: organize images in folders
+          });
+
+          if (!result.secure_url) {
+              // return res.status(400).json({ message: "Failed to upload image" });
+              return next(new HttpError("Failed to upload image"), 400)
+          }
+
+         profileImagePath = result.secure_url;
+
+        } catch (uploadError) {
+            console.error('Cloudinary upload error:', uploadError);
+            // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+            return next(new HttpError("Image upload failed " + uploadError.message ), 500)
+        }
+
+        const createdPost = await Post.create({title, description, category, thumbnail: profileImagePath, creator: req.user.id})
+        if(!createdPost) return next(new HttpError("Error occured while creating a new post", 422))
+
+        const user = await User.findById(req.user.id)
+
+        if(user) {
+            const updatedUser = await User.findByIdAndUpdate(req.user.id, {posts: user.posts + 1})
+            if(!updatedUser) return next(new HttpError("user updated failed", 422))
+        }
+
+        res.status(200).json(createdPost)
     } catch(error){
         return next(new HttpError(error))
     }
@@ -83,7 +117,7 @@ const getPostsByAuthor = async (req, res, next) => {
         const getPostsByAuthors = await Post.find({creator: author})
         if(!getPostsByAuthors) return next(new HttpError('Error occured while getting the author posts', 422))
 
-        if(getPostsByAuthors.length === 0) return next(new HttpError('posts not found for author: '+author, 422))
+        if(getPostsByAuthors.length === 0) res.status(204).json({message: "no posts available"})
 
         res.status(200).json(getPostsByAuthors)
     } catch (error) {
@@ -112,17 +146,51 @@ const editPost = async (req, res, next) => {
         }
         else{
            const {thumbnail} = req.files
-           fs.unlink(path.join(__dirname, "..", "uploads", getPost.thumbnail), async(err) => {
+/*            fs.unlink(path.join(__dirname, "..", "uploads", getPost.thumbnail), async(err) => {
                 if(err) return next(new HttpError('error occured while deleting the file', 422))
-           })
-           fileName = thumbnail.name
+           }) */
+          
+           /* delete uploaded image */
+           try {
+            await cloudinary.uploader.destroy(`BLOG_Images/${getPost.thumbnail.split("/").pop().split(".")[0]}`, {
+                    invalidate: true,
+                    resource_type: "image"
+                });
+            } catch (error) {
+                console.error('Cloudinary delete image error:', error);
+                // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+                return next(new HttpError("Delete uploaded images failed " + error.message ), 500)
+            }
+           
+/*            fileName = thumbnail.name
            splittedFileName = fileName.split('.')
            newFileName = splittedFileName[0] + "." + uuid() + "." + splittedFileName[splittedFileName.length - 1]
+           
            thumbnail.mv(path.join(__dirname, '..', 'uploads', newFileName), async (err) => {
                if(err) return next(new HttpError('error in saving the file', 422))  
-           })
+           }) */
 
-           const updatedPost = await Post.findByIdAndUpdate(id, {title, description, category, thumbnail: newFileName})
+               let profileImagePath = ''
+               try {
+                 // Upload new image
+                 const result = await cloudinary.uploader.upload(thumbnail.tempFilePath, {
+                     folder: 'BLOG_Images' // Optional: organize images in folders
+                 });
+       
+                 if (!result.secure_url) {
+                     // return res.status(400).json({ message: "Failed to upload image" });
+                     return next(new HttpError("Failed to upload image"), 400)
+                 }
+       
+                profileImagePath = result.secure_url;
+       
+               } catch (uploadError) {
+                   console.error('Cloudinary upload error:', uploadError);
+                   // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+                   return next(new HttpError("Image upload failed " + uploadError.message ), 500)
+               }    
+
+           const updatedPost = await Post.findByIdAndUpdate(id, {title, description, category, thumbnail: profileImagePath})
            if(!updatedPost) return next(new HttpError('error in updating the post', 422))
 
            res.status(200).json(updatedPost)
@@ -142,9 +210,19 @@ const deletePost = async (req, res, next) => {
         const post = await Post.findById(id)
 
         //delete the post's file
-        fs.unlink(path.join(__dirname, "..", "uploads", post.thumbnail), async(err) => {
+/*         fs.unlink(path.join(__dirname, "..", "uploads", post.thumbnail), async(err) => {
             if(err) return next(new HttpError("Error occured while deleting the post's thumbnail", 422))
-        })
+        }) */
+            try {
+                await cloudinary.uploader.destroy(`BLOG_Images/${post.thumbnail.split("/").pop().split(".")[0]}`, {
+                        invalidate: true,
+                        resource_type: "image"
+                    });
+            } catch (error) {
+                    console.error('Cloudinary delete image error:', error);
+                    // return res.status(500).json({ message: "Image upload failed", error: uploadError.message });
+                    return next(new HttpError("Delete uploaded images failed " + error.message ), 500)
+            }
 
         // get the creator
         const getCreator = await User.findById(post.creator);
