@@ -33,14 +33,14 @@ function AuthorPosts() {
     return (
         <section className="posts">
             <div className="container posts__container">
-                {posts.length > 0 ? 
-                    <> { posts?.map(({_id: id, thumbnail, category, title, description, creator, createdAt}) => {
+                {posts?.length > 0 ? 
+                    (<> { posts?.map(({_id: id, thumbnail, category, title, description, creator, createdAt}) => {
                             return (                            
                             <PostItem key={id} postId={id} thumbnail={thumbnail} category={category} title={title} description={description}
                                 creator={creator} created={createdAt}/>                                                    
                             )
                         })} 
-                    </> : <div>No Posts Available</div>
+                    </>) : <div>No Posts Available</div>
                 }
             </div>
         </section>
